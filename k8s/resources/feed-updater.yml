@@ -1,0 +1,59 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: feed-updater
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - image: mbrugger/ttrss-php-fpm:latest
+            name: feed-updater
+            args:
+              - /bin/su
+              - -p
+              - -s
+              - /bin/sh
+              - www-data
+              - -c
+              - php update.php --feeds
+            volumeMounts:
+              - name: data-volume
+                mountPath: /var/www/html/
+              - name: app-config-php-volume
+                mountPath: /var/www/html/config.php
+                subPath: config.php
+            env:
+              - name: DB_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: db-credentials
+                    key: DB_USER
+              - name: DB_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: db-credentials
+                    key: DB_PASS
+            envFrom:
+              - configMapRef:
+                  name: app-config
+          restartPolicy: OnFailure
+          volumes:
+            - name: data-volume
+              hostPath:
+                # directory location on host
+                path: "/mnt/ttrss"
+                # this field is optional
+                type: Directory
+            - name: app-config-php-volume
+              configMap:
+                name: app-config-php
+          imagePullSecrets:
+            - name: regcred
+          nodeSelector:
+            nodetype: pi

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ttrss
+
+# Copy this sample-config folder to a separate location.
+# You don't want your db secrets/URLs to appear on github publicly
+# Fix relative path to point to the k8s folder in the ttrss-kubernetes repository
+bases:
+- ../ttrss-kubernetes/k8s/
+
+configMapGenerator:
+- name: app-config
+  env: configmap/app-config.env
+
+secretGenerator:
+  - name: db-credentials
+    env: secrets/database.env 

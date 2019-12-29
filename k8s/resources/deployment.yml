@@ -1,0 +1,87 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ttrss-app
+  name: ttrss-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ttrss-app
+  template:
+    metadata:
+      labels:
+        app: ttrss-app
+    spec:
+      containers:
+      - image: mbrugger/ttrss-php-fpm:latest
+        name: app
+        ports:
+        - containerPort: 9000
+          protocol: TCP
+        volumeMounts:
+        - name: data-volume
+          mountPath: /var/www/html/
+        - name: app-config-php-volume
+          mountPath: /var/www/html/config.php
+          subPath: config.php
+        env:
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: DB_USER
+          - name: DB_PASS
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: DB_PASS
+        envFrom:
+          - configMapRef:
+              name: app-config
+      - image: nginx:1.16-alpine
+        name: nginx
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: nginx.conf
+        - name: data-volume
+          mountPath: /var/www/html/
+      initContainers:
+      - name: init-app
+        image: mbrugger/ttrss-php-fpm:latest
+        env:
+        - name: GIT_URL
+          value: https://git.tt-rss.org/fox/tt-rss.git
+        - name: WORKSPACE
+          value: /var/www/html
+        volumeMounts:
+        - name: data-volume
+          mountPath: /var/www/html/
+        command:
+        - sh
+        - -c
+        - git clone --depth=1 $GIT_URL "$WORKSPACE" || git -C $WORKSPACE pull && chown -R www-data:www-data "$WORKSPACE"
+      volumes:
+        - name: data-volume
+          hostPath:
+            # directory location on host
+            path: "/mnt/ttrss"
+            # this field is optional
+            type: Directory
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
+        - name: app-config-php-volume
+          configMap:
+            name: app-config-php
+      imagePullSecrets:
+      - name: regcred
+      nodeSelector:
+        nodetype: pi
+

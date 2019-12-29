@@ -1,0 +1,39 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: git-updater
+spec:
+  schedule: "15 4 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - image: mbrugger/ttrss-php-fpm:latest
+            name: git-updater
+            args:
+              - /bin/su
+              - -p
+              - -s
+              - /bin/sh
+              - www-data
+              - -c
+              - git pull
+            volumeMounts:
+              - name: data-volume
+                mountPath: /var/www/html/
+          restartPolicy: OnFailure
+          volumes:
+            - name: data-volume
+              hostPath:
+                # directory location on host
+                path: "/mnt/ttrss"
+                # this field is optional
+                type: Directory
+          imagePullSecrets:
+            - name: regcred
+          nodeSelector:
+            nodetype: pi
